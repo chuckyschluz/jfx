@@ -164,15 +164,6 @@ class ControlUtils {
         };
     }
 
-    private static <S> void processContiguousRanges(MultipleSelectionModelBase<S> sm, BitSet indices, boolean isSet) {
-        int begin = indices.nextSetBit(0);
-        while (begin >= 0) {
-            int end = indices.nextClearBit(begin);
-            sm.selectedIndices.set(begin, end, isSet);
-            begin = indices.nextSetBit(end);
-        }
-    }
-
     public static <S> void updateSelectedIndices(MultipleSelectionModelBase<S> sm, boolean isCellSelectionEnabled, ListChangeListener.Change<? extends TablePositionBase<?>> c, IntPredicate removeRowFilter) {
         sm.selectedIndices._beginChange();
 
@@ -184,13 +175,21 @@ class ControlUtils {
                 .filter(removeRowFilter)
                 .collect(BitSet::new, BitSet::set, BitSet::or);
 
-            processContiguousRanges(sm, removed, false);
+            for (int begin = removed.nextSetBit(0); begin >= 0;) {
+                int end = removed.nextClearBit(begin);
+                sm.selectedIndices.set(begin, end, false);
+                begin = removed.nextSetBit(end);
+            }
 
             BitSet added = c.getAddedSubList().stream()
                 .mapToInt(TablePositionBase::getRow)
                 .collect(BitSet::new, BitSet::set, BitSet::or);
 
-            processContiguousRanges(sm, added, true);
+            for (int begin = added.nextSetBit(0); begin >= 0;) {
+                int end = added.nextClearBit(begin);
+                sm.selectedIndices.set(begin, end, true);
+                begin = added.nextSetBit(end);
+            }
 
             sm.stopAtomic();
 
