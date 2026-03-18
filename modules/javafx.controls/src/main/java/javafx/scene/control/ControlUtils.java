@@ -34,6 +34,7 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -163,13 +164,12 @@ class ControlUtils {
         };
     }
 
-    private static <S> void processContiguousRanges(MultipleSelectionModelBase<S> sm, List<Integer> indices, boolean isSet) {
-        int size = indices.size();
-        for (int i = 0; i < size; i++) {
-            int begin = indices.get(i);
-            while (i + 1 < size && indices.get(i + 1) == indices.get(i) + 1) i++;
-            int end = indices.get(i) + 1;
+    private static <S> void processContiguousRanges(MultipleSelectionModelBase<S> sm, BitSet indices, boolean isSet) {
+        int begin = indices.nextSetBit(0);
+        while (begin >= 0) {
+            int end = indices.nextClearBit(begin);
             sm.selectedIndices.set(begin, end, isSet);
+            begin = indices.nextSetBit(end);
         }
     }
 
@@ -179,22 +179,16 @@ class ControlUtils {
         while (c.next()) {
             sm.startAtomic();
 
-            final List<Integer> removed = c.getRemoved().stream()
-                    .mapToInt(TablePositionBase::getRow)
-                    .distinct()
-                    .filter(removeRowFilter)
-                    .sorted()
-                    .boxed()
-                    .toList();
+            BitSet removed = c.getRemoved().stream()
+                .mapToInt(TablePositionBase::getRow)
+                .filter(removeRowFilter)
+                .collect(BitSet::new, BitSet::set, BitSet::or);
 
             processContiguousRanges(sm, removed, false);
 
-            final List<Integer> added = c.getAddedSubList().stream()
-                    .mapToInt(TablePositionBase::getRow)
-                    .distinct()
-                    .sorted()
-                    .boxed()
-                    .toList();
+            BitSet added = c.getAddedSubList().stream()
+                .mapToInt(TablePositionBase::getRow)
+                .collect(BitSet::new, BitSet::set, BitSet::or);
 
             processContiguousRanges(sm, added, true);
 
@@ -207,12 +201,13 @@ class ControlUtils {
                 int tpRow = c.getList().get(from).getRow();
                 from = sm.selectedIndices.indexOf(tpRow);
             }
-            final int to = from + added.size();
+            int to = from + added.cardinality();
 
+            List<Integer> removedIndices = removed.stream().boxed().toList();
             if (c.wasReplaced()) {
-                sm.selectedIndices._nextReplace(from, to, removed);
+                sm.selectedIndices._nextReplace(from, to, removedIndices);
             } else if (c.wasRemoved()) {
-                sm.selectedIndices._nextRemove(from, removed);
+                sm.selectedIndices._nextRemove(from, removedIndices);
             } else if (c.wasAdded()) {
                 sm.selectedIndices._nextAdd(from, to);
             }
