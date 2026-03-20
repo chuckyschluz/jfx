@@ -45,6 +45,7 @@ import javafx.scene.Node;
 
 import com.sun.javafx.event.EventHandlerManager;
 import java.util.Comparator;
+import javafx.beans.property.ReadOnlyBooleanPropertyBase;
 import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.beans.property.ReadOnlyBooleanWrapper;
 import javafx.beans.property.ReadOnlyObjectProperty;
@@ -579,14 +580,35 @@ public class TreeItem<T> implements EventTarget { //, Comparable<TreeItem<T>> {
 
 
     // --- Leaf
-    private ReadOnlyBooleanWrapper leaf;
-    private void setLeaf(boolean value) {
-        if (value && leaf == null) {
-            return;
-        } else if (leaf == null) {
-            leaf = new ReadOnlyBooleanWrapper(this, "leaf", true);
+    private boolean _leaf = true;
+    private LeafProperty leaf = null;
+
+    private class LeafProperty extends ReadOnlyBooleanPropertyBase {
+
+        @Override public boolean get() {
+            return _leaf;
         }
-        leaf.setValue(value);
+
+        @Override public Object getBean() {
+            return TreeItem.this;
+        }
+
+        @Override public String getName() {
+            return "leaf";
+        }
+
+        @Override protected void fireValueChangedEvent() {
+            super.fireValueChangedEvent();
+        }
+    }
+
+    private void setLeaf(boolean value) {
+        if(_leaf != value) {
+            _leaf = value;
+            if (leaf != null) {
+                leaf.fireValueChangedEvent();
+            }
+        }
     }
 
     /**
@@ -597,7 +619,7 @@ public class TreeItem<T> implements EventTarget { //, Comparable<TreeItem<T>> {
      * disclosure node or respond to expansion requests.
      * @return true if this TreeItem has no children
      */
-    public boolean isLeaf() { return leaf == null ? true : leaf.getValue(); }
+    public boolean isLeaf() { return _leaf; }
 
     /**
      * Represents the TreeItem leaf property, which is true if the TreeItem has no children.
@@ -605,9 +627,9 @@ public class TreeItem<T> implements EventTarget { //, Comparable<TreeItem<T>> {
      */
     public final ReadOnlyBooleanProperty leafProperty() {
         if (leaf == null) {
-            leaf = new ReadOnlyBooleanWrapper(this, "leaf", true);
+            leaf = new LeafProperty();
         }
-        return leaf.getReadOnlyProperty();
+        return leaf;
     }
 
 
