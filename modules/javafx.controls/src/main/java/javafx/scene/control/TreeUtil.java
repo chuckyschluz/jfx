@@ -25,13 +25,43 @@
 
 package javafx.scene.control;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.Iterator;
 import java.util.List;
+import java.util.NoSuchElementException;
 
 /**
  * A package protected util class used by TreeView and TreeTableView to reduce
  * the level of code duplication.
  */
 class TreeUtil {
+
+    /**
+     * Returns an Iterable that traverses all visible (expanded) TreeItems in
+     * pre-order depth-first order, starting from root (inclusive).
+     */
+    static <T> Iterable<TreeItem<T>> visibleItems(TreeItem<T> root) {
+        return () -> new Iterator<>() {
+            private final Deque<TreeItem<T>> stack = new ArrayDeque<>();
+            { if (root != null) stack.push(root); }
+
+            @Override public boolean hasNext() { return !stack.isEmpty(); }
+
+            @Override public TreeItem<T> next() {
+                if (!hasNext()) throw new NoSuchElementException();
+                TreeItem<T> item = stack.pop();
+                if (!item.isLeaf() && item.isExpanded()) {
+                    List<TreeItem<T>> children = item.getChildren();
+                    for (int i = children.size() - 1; i >= 0; i--) {
+                        TreeItem<T> child = children.get(i);
+                        if (child != null) stack.push(child);
+                    }
+                }
+                return item;
+            }
+        };
+    }
 
     static <T> int getExpandedDescendantCount(TreeItem<T> node, boolean treeItemCountDirty) {
         if (node == null) return 0;

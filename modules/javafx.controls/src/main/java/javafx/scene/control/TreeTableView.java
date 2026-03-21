@@ -3163,30 +3163,36 @@ public class TreeTableView<S> extends Control {
         @Override public void selectAll() {
             if (getSelectionMode() == SelectionMode.SINGLE) return;
 
-            if (isCellSelectionEnabled()) {
-                List<TreeTablePosition<S,?>> indices = new ArrayList<>();
-                TreeTableColumn<S,?> column;
-                TreeTablePosition<S,?> tp = null;
-                for (int col = 0; col < getTreeTableView().getVisibleLeafColumns().size(); col++) {
-                    column = getTreeTableView().getVisibleLeafColumns().get(col);
-                    for (int row = 0; row < getRowCount(); row++) {
-                        tp = new TreeTablePosition<>(getTreeTableView(), row, column);
-                        indices.add(tp);
+            final TreeTableView<S> ttv = getTreeTableView();
+            final boolean showRoot = ttv.isShowRoot();
+            final boolean cellSelection = isCellSelectionEnabled();
+            List<TreeTablePosition<S,?>> indices = new ArrayList<>();
+            TreeTablePosition<S,?> tp = null;
+            int dfsRow = 0;
+            for (TreeItem<S> item : TreeUtil.visibleItems(ttv.getRoot())) {
+                int row = showRoot ? dfsRow : dfsRow - 1;
+                if (row >= 0) {
+                    ttv.treeItemCacheMap.put(dfsRow, new SoftReference<>(item));
+                    if (cellSelection) {
+                        for (int col = 0; col < ttv.getVisibleLeafColumns().size(); col++) {
+                            TreeTableColumn<S,?> column = ttv.getVisibleLeafColumns().get(col);
+                            tp = new TreeTablePosition<>(ttv, row, column, item);
+                            indices.add(tp);
+                        }
+                    } else {
+                        indices.add(new TreeTablePosition<>(ttv, row, null, item));
                     }
                 }
-                selectedCellsMap.setAll(indices);
+                dfsRow++;
+            }
+            selectedCellsMap.setAll(indices);
 
+            if (cellSelection) {
                 if (tp != null) {
                     select(tp.getRow(), tp.getTableColumn());
                     focus(tp.getRow(), tp.getTableColumn());
                 }
             } else {
-                List<TreeTablePosition<S,?>> indices = new ArrayList<>();
-                for (int i = 0; i < getRowCount(); i++) {
-                    indices.add(new TreeTablePosition<>(getTreeTableView(), i, null));
-                }
-                selectedCellsMap.setAll(indices);
-
                 int focusedIndex = getFocusedIndex();
                 if (focusedIndex == -1) {
                     final int itemCount = getItemCount();
@@ -3224,25 +3230,24 @@ public class TreeTableView<S> extends Control {
 
             List<TreeTablePosition<S,?>> cellsToSelect = new ArrayList<>();
 
-            for (int _row = _minRow; _row <= _maxRow; _row++) {
-                // begin copy/paste of select(int, column) method (with some
-                // slight modifications)
-                if (_row < 0 || _row >= itemCount) continue;
-
-                if (! isCellSelectionEnabled) {
-                    cellsToSelect.add(new TreeTablePosition<>(treeTableView, _row, (TreeTableColumn<S,?>)minColumn));
-                } else {
-                    for (int _col = _minColumnIndex; _col <= _maxColumnIndex; _col++) {
-                        final TreeTableColumn<S, ?> column = treeTableView.getVisibleLeafColumn(_col);
-
-                        // if I'm in cell selection mode but the column is null, I don't want
-                        // to select the whole row instead...
-                        if (column == null && isCellSelectionEnabled) continue;
-
-                        cellsToSelect.add(new TreeTablePosition<>(treeTableView, _row, column));
-                        // end copy/paste
+            final boolean showRoot = treeTableView.isShowRoot();
+            int dfsRow = 0;
+            for (TreeItem<S> item : TreeUtil.visibleItems(treeTableView.getRoot())) {
+                int _row = showRoot ? dfsRow : dfsRow - 1;
+                if (_row > _maxRow || _row >= itemCount) break;
+                if (_row >= _minRow && _row >= 0) {
+                    treeTableView.treeItemCacheMap.put(dfsRow, new SoftReference<>(item));
+                    if (! isCellSelectionEnabled) {
+                        cellsToSelect.add(new TreeTablePosition<>(treeTableView, _row, (TreeTableColumn<S,?>)minColumn, item));
+                    } else {
+                        for (int _col = _minColumnIndex; _col <= _maxColumnIndex; _col++) {
+                            final TreeTableColumn<S, ?> column = treeTableView.getVisibleLeafColumn(_col);
+                            if (column == null && isCellSelectionEnabled) continue;
+                            cellsToSelect.add(new TreeTablePosition<>(treeTableView, _row, column, item));
+                        }
                     }
                 }
+                dfsRow++;
             }
 
             // to prevent duplication we remove all currently selected cells from
