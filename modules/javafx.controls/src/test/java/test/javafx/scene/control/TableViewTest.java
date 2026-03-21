@@ -6491,4 +6491,61 @@ public class TableViewTest {
         cell = VirtualFlowTestUtils.getCell(table, 0, 0);
         assertEquals(newName, cell.getText());
     }
+
+    @Test
+    void testBulkSetClear() {
+        TableView<Integer> t1 = new TableView<>();
+        TableView<Integer> t2 = new TableView<>();
+        TableView.TableViewSelectionModel sm1 = t1.getSelectionModel();
+        TableView.TableViewSelectionModel sm2 = t2.getSelectionModel();
+        TableColumn<Integer, ?> c1 = new TableColumn<>("c1");
+        TableColumn<Integer, ?> c2 = new TableColumn<>("c2");
+        t1.getColumns().add(c1);
+        t2.getColumns().add(c2);
+        sm1.setSelectionMode(SelectionMode.MULTIPLE);
+        sm2.setSelectionMode(SelectionMode.MULTIPLE);
+        sm1.setCellSelectionEnabled(true);
+        sm2.setCellSelectionEnabled(true);
+
+        int size = 20;
+        for (int i = 0; i < size; i++) {
+            t1.getItems().add(i);
+            t2.getItems().add(i);
+        }
+
+        // selectRange(ra, rb) selects the rows in the half-open interval [ra, rb)
+
+        sm1.selectRange(3, 7);
+        sm2.selectIndices(3, 4, 5, 6);
+        assertEquals(sm1.getSelectedIndices(), sm2.getSelectedIndices());
+
+        sm1.selectRange(5, 9);
+        sm2.selectIndices(5, 6, 7, 8);
+        assertEquals(sm1.getSelectedIndices(), sm2.getSelectedIndices());
+
+        sm1.selectRange(17, 19);
+        sm2.selectIndices(17, 18);
+        assertEquals(sm1.getSelectedIndices(), sm2.getSelectedIndices());
+
+        // selectRange(ra, ca, rb, cb) selects the rows in the closed interval [ra, rb]
+
+        sm1.selectRange(13, c1, 16, c1);
+        sm2.select(13, c1);
+        sm2.select(14, c1);
+        sm2.select(15, c1);
+        sm2.select(16, c1);
+        assertEquals(sm1.getSelectedIndices(), sm2.getSelectedIndices());
+
+        sm1.clearSelection();
+        for (int i = 0; i < size; i++) {
+            sm2.clearSelection(i);
+        }
+        assertEquals(sm1.getSelectedIndices(), sm2.getSelectedIndices());
+
+        sm1.selectAll();
+        for (int i = 0; i < size; i++) {
+            sm2.select(i);
+        }
+        assertEquals(sm1.getSelectedIndices(), sm2.getSelectedIndices());
+    }
 }
