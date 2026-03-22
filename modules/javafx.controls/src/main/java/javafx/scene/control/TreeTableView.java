@@ -31,8 +31,9 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
+import java.util.NavigableMap;
+import java.util.TreeMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -760,7 +761,7 @@ public class TreeTableView<S> extends Control {
 
     // Used in the getTreeItem(int row) method to act as a cache.
     // See JDK-8125681 for the justification and performance gains.
-    private Map<Integer, SoftReference<TreeItem<S>>> treeItemCacheMap = new HashMap<>();
+    private NavigableMap<Integer, SoftReference<TreeItem<S>>> treeItemCacheMap = new TreeMap<>();
 
     // this is the only publicly writable list for columns. This represents the
     // columns as they are given initially by the developer.
@@ -1806,20 +1807,45 @@ public class TreeTableView<S> extends Control {
 
         if (expandedItemCountDirty) {
             updateExpandedItemCount(getRoot());
-        } else {
-            if (treeItemCacheMap.containsKey(_row)) {
-                SoftReference<TreeItem<S>> treeItemRef = treeItemCacheMap.get(_row);
-                TreeItem<S> treeItem = treeItemRef.get();
-                if (treeItem != null) {
-                    return treeItem;
-                }
-            }
         }
 
+        SoftReference<TreeItem<S>> ref = treeItemCacheMap.get(_row);
+        if (ref != null) {
+            TreeItem<S> cached = ref.get();
+            if (cached != null) return cached;
+        }
+
+        // Find the nearest cached entry below _row and start a DFS from there,
+        // caching every item visited. If the target lies outside that entry's
+        // subtree the iterator exhausts; we then fall back to the next lower
+        // cached entry and retry. Root is always seeded after updateExpandedItemCount,
+        // so the final retry is a full DFS from root which is guaranteed to succeed.
+        Integer startKey = treeItemCacheMap.floorKey(_row - 1);
+        while (startKey != null) {
+            SoftReference<TreeItem<S>> startRef = treeItemCacheMap.get(startKey);
+            TreeItem<S> start = startRef != null ? startRef.get() : null;
+            if (start != null) {
+                int dfsRow = startKey;
+                for (TreeItem<S> item : TreeUtil.visibleItems(start)) {
+                    if (treeItemCacheMap.get(dfsRow) == null || treeItemCacheMap.get(dfsRow).get() == null) {
+                        treeItemCacheMap.put(dfsRow, new SoftReference<>(item));
+                    }
+                    if (dfsRow == _row) return item;
+                    dfsRow++;
+                }
+            }
+            startKey = treeItemCacheMap.floorKey(startKey - 1);
+        }
+
+        // Fail-safe: should not be reached in normal operation since root is always
+        // seeded in the cache. Protects against the theoretical case where all
+        // SoftReferences (including root) have been collected under extreme memory
+        // pressure, leaving the cache empty with no DFS starting point.
         TreeItem<S> treeItem = TreeUtil.getItem(getRoot(), _row, expandedItemCountDirty);
         treeItemCacheMap.put(_row, new SoftReference<>(treeItem));
         return treeItem;
     }
+
 
     /**
      * Returns the number of levels of 'indentation' of the given TreeItem,
@@ -2117,9 +2143,11 @@ public class TreeTableView<S> extends Control {
         setExpandedItemCount(TreeUtil.updateExpandedItemCount(treeItem, expandedItemCountDirty, isShowRoot()));
 
         if (expandedItemCountDirty) {
-            // this is a very inefficient thing to do, but for now having a cache
-            // is better than nothing at all...
             treeItemCacheMap.clear();
+            TreeItem<S> root = getRoot();
+            if (root != null) {
+                treeItemCacheMap.put(0, new SoftReference<>(root));
+            }
         }
 
         expandedItemCountDirty = false;
@@ -3160,27 +3188,8 @@ public class TreeTableView<S> extends Control {
             }
         }
 
-        private void warmTreeItemCache(int maxVisibleRow) {
-            boolean showRoot = treeTableView.isShowRoot();
-            int maxDfsRow = showRoot ? maxVisibleRow : maxVisibleRow + 1;
-            SoftReference<TreeItem<S>> ref = treeTableView.treeItemCacheMap.get(maxDfsRow);
-            if (ref != null && ref.get() != null) return;
-
-            int dfsRow = 0;
-            for (TreeItem<S> item : TreeUtil.visibleItems(treeTableView.getRoot())) {
-                int row = showRoot ? dfsRow : dfsRow - 1;
-                if (row > maxVisibleRow) break;
-                if (row >= 0) {
-                    treeTableView.treeItemCacheMap.put(dfsRow, new SoftReference<>(item));
-                }
-                dfsRow++;
-            }
-        }
-
         @Override public void selectAll() {
             if (getSelectionMode() == SelectionMode.SINGLE) return;
-
-            warmTreeItemCache(getRowCount() - 1);
 
             if (isCellSelectionEnabled()) {
                 List<TreeTablePosition<S,?>> indices = new ArrayList<>();
@@ -3242,8 +3251,6 @@ public class TreeTableView<S> extends Control {
             final int _maxRow = Math.max(minRow, maxRow);
 
             List<TreeTablePosition<S,?>> cellsToSelect = new ArrayList<>();
-
-            warmTreeItemCache(_maxRow);
 
             for (int _row = _minRow; _row <= _maxRow; _row++) {
                 // begin copy/paste of select(int, column) method (with some
