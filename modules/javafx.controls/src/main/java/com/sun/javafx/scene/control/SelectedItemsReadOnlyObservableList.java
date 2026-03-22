@@ -46,53 +46,46 @@ public abstract class SelectedItemsReadOnlyObservableList<E> extends ObservableL
         this.itemsRefList = new ArrayList<>();
 
         selectedIndices.addListener((ListChangeListener<Integer>)c -> {
+            int totalRemovedSize = 0;
             beginChange();
 
-            // itemsRefList is kept incrementally in sync with selectedIndices within this loop,
-            // so c.getFrom() positions always agree with itemsRefList — no totalRemovedSize offset needed.
             while (c.next()) {
                 if (c.wasReplaced()) {
-                    List<E> removed = getRemovedElements(c, 0);
+                    List<E> removed = getRemovedElements(c, totalRemovedSize);
                     List<E> added = getAddedElements(c);
                     if (!removed.equals(added)) {
                         nextReplace(c.getFrom(), c.getTo(), removed);
                     }
-                    itemsRefList.subList(c.getFrom(), c.getFrom() + c.getRemovedSize()).clear();
-                    List<WeakReference<E>> newRefs = new ArrayList<>(added.size());
-                    for (E item : added) {
-                        newRefs.add(new WeakReference<>(item));
-                    }
-                    itemsRefList.addAll(c.getFrom(), newRefs);
                 } else if (c.wasAdded()) {
                     nextAdd(c.getFrom(), c.getTo());
-                    List<WeakReference<E>> newRefs = new ArrayList<>(c.getAddedSize());
-                    for (int v : c.getAddedSubList()) {
-                        newRefs.add(new WeakReference<>(getModelItem(v)));
-                    }
-                    itemsRefList.addAll(c.getFrom(), newRefs);
                 } else if (c.wasRemoved()) {
                     int removedSize = c.getRemovedSize();
                     if (removedSize == 1) {
-                        nextRemove(c.getFrom(), getRemovedModelItem(c.getFrom()));
+                        nextRemove(c.getFrom(), getRemovedModelItem(totalRemovedSize + c.getFrom()));
                     } else {
-                        nextRemove(c.getFrom(), getRemovedElements(c, 0));
+                        nextRemove(c.getFrom(), getRemovedElements(c, totalRemovedSize));
                     }
-                    itemsRefList.subList(c.getFrom(), c.getFrom() + removedSize).clear();
+                    totalRemovedSize += removedSize;
                 } else if (c.wasPermutated()) {
                     int[] permutation = new int[size()];
                     for (int i = 0; i < size(); i++) {
                         permutation[i] = c.getPermutation(i);
                     }
                     nextPermutation(c.getFrom(), c.getTo(), permutation);
-                    List<WeakReference<E>> segment = new ArrayList<>(itemsRefList.subList(c.getFrom(), c.getTo()));
-                    for (int i = c.getFrom(); i < c.getTo(); i++) {
-                        itemsRefList.set(c.getPermutation(i), segment.get(i - c.getFrom()));
-                    }
                 } else if (c.wasUpdated()) {
                     for (int i = c.getFrom(); i < c.getTo(); i++) {
                         nextUpdate(i);
                     }
                 }
+            }
+
+            // regardless of the change, we recreate the itemsRefList to reflect the current items list.
+            // This is important for cases where items are removed (and so must their selection, but we lose
+            // access to the item before we can fire the event).
+            // FIXME we could make this more efficient by only making the reported changes to the list
+            itemsRefList.clear();
+            for (int selectedIndex : selectedIndices) {
+                itemsRefList.add(new WeakReference<>(getModelItem(selectedIndex)));
             }
 
             endChange();

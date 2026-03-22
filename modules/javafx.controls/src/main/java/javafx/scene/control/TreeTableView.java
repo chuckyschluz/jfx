@@ -3163,19 +3163,18 @@ public class TreeTableView<S> extends Control {
         @Override public void selectAll() {
             if (getSelectionMode() == SelectionMode.SINGLE) return;
 
-            final TreeTableView<S> ttv = getTreeTableView();
-            final boolean showRoot = ttv.isShowRoot();
-            final boolean cellSelection = isCellSelectionEnabled();
+            TreeTableView<S> ttv = getTreeTableView();
+            boolean showRoot = ttv.isShowRoot();
+            boolean cellSelectionEnabled = isCellSelectionEnabled();
             List<TreeTablePosition<S,?>> indices = new ArrayList<>();
             TreeTablePosition<S,?> tp = null;
-            int dfsRow = 0;
+            int _row = 0;
             for (TreeItem<S> item : TreeUtil.visibleItems(ttv.getRoot())) {
-                int row = showRoot ? dfsRow : dfsRow - 1;
+                int row = showRoot ? _row : _row - 1;
                 if (row >= 0) {
-                    ttv.treeItemCacheMap.put(dfsRow, new SoftReference<>(item));
-                    if (cellSelection) {
-                        for (int col = 0; col < ttv.getVisibleLeafColumns().size(); col++) {
-                            TreeTableColumn<S,?> column = ttv.getVisibleLeafColumns().get(col);
+                    ttv.treeItemCacheMap.put(_row, new SoftReference<>(item));
+                    if (cellSelectionEnabled) {
+                        for (TreeTableColumn<S,?> column : ttv.getVisibleLeafColumns()) {
                             tp = new TreeTablePosition<>(ttv, row, column, item);
                             indices.add(tp);
                         }
@@ -3183,11 +3182,11 @@ public class TreeTableView<S> extends Control {
                         indices.add(new TreeTablePosition<>(ttv, row, null, item));
                     }
                 }
-                dfsRow++;
+                _row++;
             }
             selectedCellsMap.setAll(indices);
 
-            if (cellSelection) {
+            if (cellSelectionEnabled) {
                 if (tp != null) {
                     select(tp.getRow(), tp.getTableColumn());
                     focus(tp.getRow(), tp.getTableColumn());
@@ -3195,7 +3194,7 @@ public class TreeTableView<S> extends Control {
             } else {
                 int focusedIndex = getFocusedIndex();
                 if (focusedIndex == -1) {
-                    final int itemCount = getItemCount();
+                    int itemCount = getItemCount();
                     if (itemCount > 0) {
                         select(itemCount - 1);
                         focus(indices.get(indices.size() - 1));
@@ -3217,42 +3216,43 @@ public class TreeTableView<S> extends Control {
 
             startAtomic();
 
-            final int itemCount = getItemCount();
-            final boolean isCellSelectionEnabled = isCellSelectionEnabled();
+            TreeTableView<S> ttv = getTreeTableView();
+            boolean showRoot = ttv.isShowRoot();
+            boolean cellSelectionEnabled = isCellSelectionEnabled();
+            int itemCount = getItemCount();
 
-            final int minColumnIndex = treeTableView.getVisibleLeafIndex((TreeTableColumn<S,?>)minColumn);
-            final int maxColumnIndex = treeTableView.getVisibleLeafIndex((TreeTableColumn<S,?>)maxColumn);
-            final int _minColumnIndex = Math.min(minColumnIndex, maxColumnIndex);
-            final int _maxColumnIndex = Math.max(minColumnIndex, maxColumnIndex);
+            int minColumnIndex = treeTableView.getVisibleLeafIndex((TreeTableColumn<S,?>)minColumn);
+            int maxColumnIndex = treeTableView.getVisibleLeafIndex((TreeTableColumn<S,?>)maxColumn);
+            int _minColumnIndex = Math.min(minColumnIndex, maxColumnIndex);
+            int _maxColumnIndex = Math.max(minColumnIndex, maxColumnIndex);
 
-            final int _minRow = Math.min(minRow, maxRow);
-            final int _maxRow = Math.max(minRow, maxRow);
+            int _minRow = Math.min(minRow, maxRow);
+            int _maxRow = Math.max(minRow, maxRow);
 
             List<TreeTablePosition<S,?>> cellsToSelect = new ArrayList<>();
 
-            final boolean showRoot = treeTableView.isShowRoot();
-            int dfsRow = 0;
-            for (TreeItem<S> item : TreeUtil.visibleItems(treeTableView.getRoot())) {
-                int _row = showRoot ? dfsRow : dfsRow - 1;
-                if (_row > _maxRow || _row >= itemCount) break;
-                if (_row >= _minRow && _row >= 0) {
-                    treeTableView.treeItemCacheMap.put(dfsRow, new SoftReference<>(item));
-                    if (! isCellSelectionEnabled) {
-                        cellsToSelect.add(new TreeTablePosition<>(treeTableView, _row, (TreeTableColumn<S,?>)minColumn, item));
-                    } else {
+            int _row = 0;
+            for (TreeItem<S> item : TreeUtil.visibleItems(ttv.getRoot())) {
+                int row = showRoot ? _row : _row - 1;
+                if (row > _maxRow || row >= itemCount) break;
+                if (row >= _minRow && row >= 0) {
+                    ttv.treeItemCacheMap.put(_row, new SoftReference<>(item));
+                    if (cellSelectionEnabled) {
                         for (int _col = _minColumnIndex; _col <= _maxColumnIndex; _col++) {
-                            final TreeTableColumn<S, ?> column = treeTableView.getVisibleLeafColumn(_col);
-                            if (column == null && isCellSelectionEnabled) continue;
-                            cellsToSelect.add(new TreeTablePosition<>(treeTableView, _row, column, item));
+                            TreeTableColumn<S, ?> column = ttv.getVisibleLeafColumn(_col);
+                            if (column == null) continue;
+                            if (!selectedCellsMap.isSelected(row, _col)) {
+                                cellsToSelect.add(new TreeTablePosition<>(ttv, row, column, item));
+                            }
+                        }
+                    } else {
+                        if (!selectedCellsMap.isSelected(row, -1)) {
+                            cellsToSelect.add(new TreeTablePosition<>(ttv, row, (TreeTableColumn<S,?>)minColumn, item));
                         }
                     }
                 }
-                dfsRow++;
+                _row++;
             }
-
-            // to prevent duplication we remove all currently selected cells from
-            // our list of cells to select.
-            cellsToSelect.removeAll(getSelectedCells());
 
             selectedCellsMap.addAll(cellsToSelect);
             stopAtomic();
@@ -3262,18 +3262,17 @@ public class TreeTableView<S> extends Control {
             updateSelectedIndex(maxRow);
             focus(maxRow, (TreeTableColumn<S,?>)maxColumn);
 
-            final TreeTableColumn<S,?> startColumn = (TreeTableColumn<S,?>)minColumn;
-            final TreeTableColumn<S,?> endColumn = isCellSelectionEnabled ? (TreeTableColumn<S,?>)maxColumn : startColumn;
-            final int startChangeIndex = selectedCellsMap.indexOf(new TreeTablePosition<>(treeTableView, minRow, startColumn));
-            final int endChangeIndex = selectedCellsMap.indexOf(new TreeTablePosition<>(treeTableView, maxRow, endColumn));
+            TreeTableColumn<S,?> startColumn = (TreeTableColumn<S,?>)minColumn;
+            TreeTableColumn<S,?> endColumn = cellSelectionEnabled ? (TreeTableColumn<S,?>)maxColumn : startColumn;
+            int startChangeIndex = selectedCellsMap.indexOf(new TreeTablePosition<>(ttv, minRow, startColumn));
+            int endChangeIndex = selectedCellsMap.indexOf(new TreeTablePosition<>(ttv, maxRow, endColumn));
 
             if (startChangeIndex > -1 && endChangeIndex > -1) {
-                final int startIndex = Math.min(startChangeIndex, endChangeIndex);
-                final int endIndex = Math.max(startChangeIndex, endChangeIndex);
+                int startIndex = Math.min(startChangeIndex, endChangeIndex);
+                int endIndex = Math.max(startChangeIndex, endChangeIndex);
 
                 ListChangeListener.Change c = new NonIterableChange.SimpleAddChange<>(startIndex, endIndex + 1, selectedCellsSeq);
                 fireCustomSelectedCellsListChangeEvent(c);
-//                selectedCellsSeq.fireChange(() -> selectedCellsSeq._nextAdd(startIndex, endIndex + 1));
             }
         }
 
