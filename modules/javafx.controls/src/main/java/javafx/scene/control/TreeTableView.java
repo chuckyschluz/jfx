@@ -3194,7 +3194,7 @@ public class TreeTableView<S> extends Control {
             } else {
                 int focusedIndex = getFocusedIndex();
                 if (focusedIndex == -1) {
-                    int itemCount = getItemCount();
+                    final int itemCount = getItemCount();
                     if (itemCount > 0) {
                         select(itemCount - 1);
                         focus(indices.get(indices.size() - 1));
@@ -3217,17 +3217,17 @@ public class TreeTableView<S> extends Control {
             startAtomic();
 
             TreeTableView<S> ttv = getTreeTableView();
-            boolean showRoot = ttv.isShowRoot();
-            boolean cellSelectionEnabled = isCellSelectionEnabled();
-            int itemCount = getItemCount();
+            final boolean showRoot = ttv.isShowRoot();
+            final int itemCount = getItemCount();
+            final boolean isCellSelectionEnabled = isCellSelectionEnabled();
 
-            int minColumnIndex = treeTableView.getVisibleLeafIndex((TreeTableColumn<S,?>)minColumn);
-            int maxColumnIndex = treeTableView.getVisibleLeafIndex((TreeTableColumn<S,?>)maxColumn);
-            int _minColumnIndex = Math.min(minColumnIndex, maxColumnIndex);
-            int _maxColumnIndex = Math.max(minColumnIndex, maxColumnIndex);
+            final int minColumnIndex = treeTableView.getVisibleLeafIndex((TreeTableColumn<S,?>)minColumn);
+            final int maxColumnIndex = treeTableView.getVisibleLeafIndex((TreeTableColumn<S,?>)maxColumn);
+            final int _minColumnIndex = Math.min(minColumnIndex, maxColumnIndex);
+            final int _maxColumnIndex = Math.max(minColumnIndex, maxColumnIndex);
 
-            int _minRow = Math.min(minRow, maxRow);
-            int _maxRow = Math.max(minRow, maxRow);
+            final int _minRow = Math.min(minRow, maxRow);
+            final int _maxRow = Math.max(minRow, maxRow);
 
             List<TreeTablePosition<S,?>> cellsToSelect = new ArrayList<>();
 
@@ -3237,7 +3237,7 @@ public class TreeTableView<S> extends Control {
                 if (row > _maxRow || row >= itemCount) break;
                 if (row >= _minRow && row >= 0) {
                     ttv.treeItemCacheMap.put(_row, new SoftReference<>(item));
-                    if (cellSelectionEnabled) {
+                    if (isCellSelectionEnabled) {
                         for (int _col = _minColumnIndex; _col <= _maxColumnIndex; _col++) {
                             TreeTableColumn<S, ?> column = ttv.getVisibleLeafColumn(_col);
                             if (column == null) continue;
@@ -3262,14 +3262,14 @@ public class TreeTableView<S> extends Control {
             updateSelectedIndex(maxRow);
             focus(maxRow, (TreeTableColumn<S,?>)maxColumn);
 
-            TreeTableColumn<S,?> startColumn = (TreeTableColumn<S,?>)minColumn;
-            TreeTableColumn<S,?> endColumn = cellSelectionEnabled ? (TreeTableColumn<S,?>)maxColumn : startColumn;
-            int startChangeIndex = selectedCellsMap.indexOf(new TreeTablePosition<>(ttv, minRow, startColumn));
-            int endChangeIndex = selectedCellsMap.indexOf(new TreeTablePosition<>(ttv, maxRow, endColumn));
+            final TreeTableColumn<S,?> startColumn = (TreeTableColumn<S,?>)minColumn;
+            final TreeTableColumn<S,?> endColumn = isCellSelectionEnabled ? (TreeTableColumn<S,?>)maxColumn : startColumn;
+            final int startChangeIndex = selectedCellsMap.indexOf(new TreeTablePosition<>(ttv, minRow, startColumn));
+            final int endChangeIndex = selectedCellsMap.indexOf(new TreeTablePosition<>(ttv, maxRow, endColumn));
 
             if (startChangeIndex > -1 && endChangeIndex > -1) {
-                int startIndex = Math.min(startChangeIndex, endChangeIndex);
-                int endIndex = Math.max(startChangeIndex, endChangeIndex);
+                final int startIndex = Math.min(startChangeIndex, endChangeIndex);
+                final int endIndex = Math.max(startChangeIndex, endChangeIndex);
 
                 ListChangeListener.Change c = new NonIterableChange.SimpleAddChange<>(startIndex, endIndex + 1, selectedCellsSeq);
                 fireCustomSelectedCellsListChangeEvent(c);
