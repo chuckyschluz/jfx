@@ -3246,22 +3246,29 @@ public class TreeTableView<S> extends Control {
             warmTreeItemCache(_maxRow);
 
             for (int _row = _minRow; _row <= _maxRow; _row++) {
+                // begin copy/paste of select(int, column) method (with some
+                // slight modifications)
                 if (_row < 0 || _row >= itemCount) continue;
 
-                if (!isCellSelectionEnabled) {
-                    if (!selectedCellsMap.isSelected(_row, -1)) {
-                        cellsToSelect.add(new TreeTablePosition<>(treeTableView, _row, (TreeTableColumn<S,?>)minColumn));
-                    }
+                if (! isCellSelectionEnabled) {
+                    cellsToSelect.add(new TreeTablePosition<>(treeTableView, _row, (TreeTableColumn<S,?>)minColumn));
                 } else {
                     for (int _col = _minColumnIndex; _col <= _maxColumnIndex; _col++) {
-                        TreeTableColumn<S,?> column = treeTableView.getVisibleLeafColumn(_col);
-                        if (column == null) continue;
-                        if (!selectedCellsMap.isSelected(_row, _col)) {
-                            cellsToSelect.add(new TreeTablePosition<>(treeTableView, _row, column));
-                        }
+                        final TreeTableColumn<S, ?> column = treeTableView.getVisibleLeafColumn(_col);
+
+                        // if I'm in cell selection mode but the column is null, I don't want
+                        // to select the whole row instead...
+                        if (column == null && isCellSelectionEnabled) continue;
+
+                        cellsToSelect.add(new TreeTablePosition<>(treeTableView, _row, column));
+                        // end copy/paste
                     }
                 }
             }
+
+            // to prevent duplication we remove all currently selected cells from
+            // our list of cells to select.
+            cellsToSelect.removeAll(getSelectedCells());
 
             selectedCellsMap.addAll(cellsToSelect);
             stopAtomic();
