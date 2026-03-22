@@ -3160,41 +3160,57 @@ public class TreeTableView<S> extends Control {
             }
         }
 
+        private void warmTreeItemCache(int maxVisibleRow) {
+            boolean showRoot = treeTableView.isShowRoot();
+            int maxDfsRow = showRoot ? maxVisibleRow : maxVisibleRow + 1;
+            SoftReference<TreeItem<S>> ref = treeTableView.treeItemCacheMap.get(maxDfsRow);
+            if (ref != null && ref.get() != null) return;
+
+            int dfsRow = 0;
+            for (TreeItem<S> item : TreeUtil.visibleItems(treeTableView.getRoot())) {
+                int row = showRoot ? dfsRow : dfsRow - 1;
+                if (row > maxVisibleRow) break;
+                if (row >= 0) {
+                    treeTableView.treeItemCacheMap.put(dfsRow, new SoftReference<>(item));
+                }
+                dfsRow++;
+            }
+        }
+
         @Override public void selectAll() {
             if (getSelectionMode() == SelectionMode.SINGLE) return;
 
+            warmTreeItemCache(getRowCount() - 1);
+
             TreeTableView<S> ttv = getTreeTableView();
-            boolean showRoot = ttv.isShowRoot();
             boolean cellSelectionEnabled = isCellSelectionEnabled();
-            List<TreeTablePosition<S,?>> indices = new ArrayList<>();
-            TreeTablePosition<S,?> tp = null;
-            int _row = 0;
-            for (TreeItem<S> item : TreeUtil.visibleItems(ttv.getRoot())) {
-                int row = showRoot ? _row : _row - 1;
-                if (row >= 0) {
-                    ttv.treeItemCacheMap.put(_row, new SoftReference<>(item));
-                    if (cellSelectionEnabled) {
-                        for (TreeTableColumn<S,?> column : ttv.getVisibleLeafColumns()) {
-                            tp = new TreeTablePosition<>(ttv, row, column, item);
-                            indices.add(tp);
-                        }
-                    } else {
-                        indices.add(new TreeTablePosition<>(ttv, row, null, item));
-                    }
-                }
-                _row++;
-            }
-            selectedCellsMap.setAll(indices);
 
             if (cellSelectionEnabled) {
+                List<TreeTablePosition<S,?>> indices = new ArrayList<>();
+                TreeTableColumn<S,?> column;
+                TreeTablePosition<S,?> tp = null;
+                for (int col = 0; col < ttv.getVisibleLeafColumns().size(); col++) {
+                    column = ttv.getVisibleLeafColumns().get(col);
+                    for (int row = 0; row < getRowCount(); row++) {
+                        tp = new TreeTablePosition<>(ttv, row, column);
+                        indices.add(tp);
+                    }
+                }
+                selectedCellsMap.setAll(indices);
                 if (tp != null) {
                     select(tp.getRow(), tp.getTableColumn());
                     focus(tp.getRow(), tp.getTableColumn());
                 }
             } else {
+                List<TreeTablePosition<S,?>> indices = new ArrayList<>();
+                for (int i = 0; i < getRowCount(); i++) {
+                    indices.add(new TreeTablePosition<>(ttv, i, null));
+                }
+                selectedCellsMap.setAll(indices);
+
                 int focusedIndex = getFocusedIndex();
                 if (focusedIndex == -1) {
-                    final int itemCount = getItemCount();
+                    int itemCount = getItemCount();
                     if (itemCount > 0) {
                         select(itemCount - 1);
                         focus(indices.get(indices.size() - 1));
@@ -3217,7 +3233,6 @@ public class TreeTableView<S> extends Control {
             startAtomic();
 
             TreeTableView<S> ttv = getTreeTableView();
-            final boolean showRoot = ttv.isShowRoot();
             final int itemCount = getItemCount();
             final boolean isCellSelectionEnabled = isCellSelectionEnabled();
 
@@ -3231,27 +3246,23 @@ public class TreeTableView<S> extends Control {
 
             List<TreeTablePosition<S,?>> cellsToSelect = new ArrayList<>();
 
-            int _row = 0;
-            for (TreeItem<S> item : TreeUtil.visibleItems(ttv.getRoot())) {
-                int row = showRoot ? _row : _row - 1;
-                if (row > _maxRow || row >= itemCount) break;
-                if (row >= _minRow && row >= 0) {
-                    ttv.treeItemCacheMap.put(_row, new SoftReference<>(item));
-                    if (isCellSelectionEnabled) {
-                        for (int _col = _minColumnIndex; _col <= _maxColumnIndex; _col++) {
-                            TreeTableColumn<S, ?> column = ttv.getVisibleLeafColumn(_col);
-                            if (column == null) continue;
-                            if (!selectedCellsMap.isSelected(row, _col)) {
-                                cellsToSelect.add(new TreeTablePosition<>(ttv, row, column, item));
-                            }
-                        }
-                    } else {
-                        if (!selectedCellsMap.isSelected(row, -1)) {
-                            cellsToSelect.add(new TreeTablePosition<>(ttv, row, (TreeTableColumn<S,?>)minColumn, item));
+            warmTreeItemCache(_maxRow);
+
+            for (int _row = _minRow; _row <= _maxRow; _row++) {
+                if (_row < 0 || _row >= itemCount) continue;
+                if (!isCellSelectionEnabled) {
+                    if (!selectedCellsMap.isSelected(_row, -1)) {
+                        cellsToSelect.add(new TreeTablePosition<>(ttv, _row, (TreeTableColumn<S,?>)minColumn));
+                    }
+                } else {
+                    for (int _col = _minColumnIndex; _col <= _maxColumnIndex; _col++) {
+                        TreeTableColumn<S,?> column = ttv.getVisibleLeafColumn(_col);
+                        if (column == null) continue;
+                        if (!selectedCellsMap.isSelected(_row, _col)) {
+                            cellsToSelect.add(new TreeTablePosition<>(ttv, _row, column));
                         }
                     }
                 }
-                _row++;
             }
 
             selectedCellsMap.addAll(cellsToSelect);
