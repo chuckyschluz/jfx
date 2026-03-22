@@ -3182,21 +3182,19 @@ public class TreeTableView<S> extends Control {
 
             warmTreeItemCache(getRowCount() - 1);
 
-            TreeTableView<S> ttv = getTreeTableView();
-            boolean cellSelectionEnabled = isCellSelectionEnabled();
-
-            if (cellSelectionEnabled) {
+            if (isCellSelectionEnabled()) {
                 List<TreeTablePosition<S,?>> indices = new ArrayList<>();
                 TreeTableColumn<S,?> column;
                 TreeTablePosition<S,?> tp = null;
-                for (int col = 0; col < ttv.getVisibleLeafColumns().size(); col++) {
-                    column = ttv.getVisibleLeafColumns().get(col);
+                for (int col = 0; col < getTreeTableView().getVisibleLeafColumns().size(); col++) {
+                    column = getTreeTableView().getVisibleLeafColumns().get(col);
                     for (int row = 0; row < getRowCount(); row++) {
-                        tp = new TreeTablePosition<>(ttv, row, column);
+                        tp = new TreeTablePosition<>(getTreeTableView(), row, column);
                         indices.add(tp);
                     }
                 }
                 selectedCellsMap.setAll(indices);
+
                 if (tp != null) {
                     select(tp.getRow(), tp.getTableColumn());
                     focus(tp.getRow(), tp.getTableColumn());
@@ -3204,13 +3202,13 @@ public class TreeTableView<S> extends Control {
             } else {
                 List<TreeTablePosition<S,?>> indices = new ArrayList<>();
                 for (int i = 0; i < getRowCount(); i++) {
-                    indices.add(new TreeTablePosition<>(ttv, i, null));
+                    indices.add(new TreeTablePosition<>(getTreeTableView(), i, null));
                 }
                 selectedCellsMap.setAll(indices);
 
                 int focusedIndex = getFocusedIndex();
                 if (focusedIndex == -1) {
-                    int itemCount = getItemCount();
+                    final int itemCount = getItemCount();
                     if (itemCount > 0) {
                         select(itemCount - 1);
                         focus(indices.get(indices.size() - 1));
@@ -3232,7 +3230,6 @@ public class TreeTableView<S> extends Control {
 
             startAtomic();
 
-            TreeTableView<S> ttv = getTreeTableView();
             final int itemCount = getItemCount();
             final boolean isCellSelectionEnabled = isCellSelectionEnabled();
 
@@ -3250,16 +3247,17 @@ public class TreeTableView<S> extends Control {
 
             for (int _row = _minRow; _row <= _maxRow; _row++) {
                 if (_row < 0 || _row >= itemCount) continue;
+
                 if (!isCellSelectionEnabled) {
                     if (!selectedCellsMap.isSelected(_row, -1)) {
-                        cellsToSelect.add(new TreeTablePosition<>(ttv, _row, (TreeTableColumn<S,?>)minColumn));
+                        cellsToSelect.add(new TreeTablePosition<>(treeTableView, _row, (TreeTableColumn<S,?>)minColumn));
                     }
                 } else {
                     for (int _col = _minColumnIndex; _col <= _maxColumnIndex; _col++) {
-                        TreeTableColumn<S,?> column = ttv.getVisibleLeafColumn(_col);
+                        TreeTableColumn<S,?> column = treeTableView.getVisibleLeafColumn(_col);
                         if (column == null) continue;
                         if (!selectedCellsMap.isSelected(_row, _col)) {
-                            cellsToSelect.add(new TreeTablePosition<>(ttv, _row, column));
+                            cellsToSelect.add(new TreeTablePosition<>(treeTableView, _row, column));
                         }
                     }
                 }
@@ -3275,8 +3273,8 @@ public class TreeTableView<S> extends Control {
 
             final TreeTableColumn<S,?> startColumn = (TreeTableColumn<S,?>)minColumn;
             final TreeTableColumn<S,?> endColumn = isCellSelectionEnabled ? (TreeTableColumn<S,?>)maxColumn : startColumn;
-            final int startChangeIndex = selectedCellsMap.indexOf(new TreeTablePosition<>(ttv, minRow, startColumn));
-            final int endChangeIndex = selectedCellsMap.indexOf(new TreeTablePosition<>(ttv, maxRow, endColumn));
+            final int startChangeIndex = selectedCellsMap.indexOf(new TreeTablePosition<>(treeTableView, minRow, startColumn));
+            final int endChangeIndex = selectedCellsMap.indexOf(new TreeTablePosition<>(treeTableView, maxRow, endColumn));
 
             if (startChangeIndex > -1 && endChangeIndex > -1) {
                 final int startIndex = Math.min(startChangeIndex, endChangeIndex);
