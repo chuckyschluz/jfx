@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2025, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, 2026, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -413,8 +413,7 @@ public class ListViewMouseInputTest {
         assertDoesNotThrow(()  -> VirtualFlowTestUtils.clickOnRow(listView, 2));
     }
 
-    // JDK-8202066: shift-click to contract a range should deselect rows outside the new range
-    @Test public void test_jdk8202066_shiftClickContractsRangeDeselects() {
+    @Test public void testShiftClickRangeDeselect() {
         sm.clearAndSelect(2);
 
         // extend selection from anchor (2) down to row 6
@@ -425,10 +424,7 @@ public class ListViewMouseInputTest {
         VirtualFlowTestUtils.clickOnRow(listView, 4, KeyModifier.SHIFT);
         assertTrue(isSelected(2, 3, 4), debug());
         assertTrue(isNotSelected(5, 6), debug());
-    }
 
-    // JDK-8202066: shift-click back to anchor (minRow == maxRow) should leave only that row selected
-    @Test public void test_jdk8202066_shiftClickToAnchorSelectsOnlyAnchor() {
         sm.clearAndSelect(4);
 
         // extend selection from anchor (4) to row 7
@@ -440,5 +436,4 @@ public class ListViewMouseInputTest {
         assertTrue(isSelected(4), debug());
         assertTrue(isNotSelected(5, 6, 7), debug());
     }
-
 }
