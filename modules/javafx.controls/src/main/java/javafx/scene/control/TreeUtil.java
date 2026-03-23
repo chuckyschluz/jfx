@@ -161,18 +161,23 @@ class TreeUtil {
     static <T> Iterable<TreeItem<T>> getItems(TreeItem<T> root) {
         return () -> new Iterator<>() {
             private final Deque<TreeItem<T>> stack = new ArrayDeque<>();
+
             { if (root != null) stack.push(root); }
 
             @Override public boolean hasNext() { return !stack.isEmpty(); }
 
             @Override public TreeItem<T> next() {
-                if (!hasNext()) throw new NoSuchElementException();
+                if (stack.isEmpty()) {
+                    throw new NoSuchElementException();
+                }
                 TreeItem<T> item = stack.pop();
                 if (!item.isLeaf() && item.isExpanded()) {
                     List<TreeItem<T>> children = item.getChildren();
                     for (int i = children.size() - 1; i >= 0; i--) {
                         TreeItem<T> child = children.get(i);
-                        if (child != null) stack.push(child);
+                        if (child != null) {
+                            stack.push(child);
+                        }
                     }
                 }
                 return item;
