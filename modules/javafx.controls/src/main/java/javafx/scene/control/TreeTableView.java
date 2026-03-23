@@ -800,20 +800,8 @@ public class TreeTableView<S> extends Control {
     private final EventHandler<TreeItem.TreeModificationEvent<S>> rootEvent = e -> {
         // this forces layoutChildren at the next pulse, and therefore
         // updates the item count if necessary
-        EventType<?> eventType = e.getEventType();
-        boolean match = false;
-        while (eventType != null) {
-            if (eventType.equals(TreeItem.<S>expandedItemCountChangeEvent())) {
-                match = true;
-                break;
-            }
-            eventType = eventType.getSuperType();
-        }
-
-        if (match) {
-            expandedItemCountDirty = true;
-            requestLayout();
-        }
+        expandedItemCountDirty = true;
+        requestLayout();
     };
 
     private final ListChangeListener<TreeTableColumn<S,?>> columnsObserver = new ListChangeListener<>() {
@@ -1053,13 +1041,20 @@ public class TreeTableView<S> extends Control {
         @Override protected void invalidated() {
             TreeItem<S> oldTreeItem = weakOldItem == null ? null : weakOldItem.get();
             if (oldTreeItem != null && weakRootEventListener != null) {
-                oldTreeItem.removeEventHandler(TreeItem.<S>treeNotificationEvent(), weakRootEventListener);
+                oldTreeItem.removeEventHandler(TreeItem.<S>expandedItemCountChangeEvent(), weakRootEventListener);
             }
 
             TreeItem<S> root = getRoot();
             if (root != null) {
+                // Register on expandedItemCountChangeEvent (not the broader treeNotificationEvent)
+                // so that rootEvent fires before the focus/selection model listeners, which
+                // register on the same specific event type but do so later — in response to the
+                // root-property change notification that propagates after this invalidated()
+                // returns.  FIFO ordering within the same event type then guarantees
+                // expandedItemCountDirty is true before any Platform.runLater callback
+                // scheduled by those models calls getTreeItem().
                 weakRootEventListener = new WeakEventHandler<>(rootEvent);
-                getRoot().addEventHandler(TreeItem.<S>treeNotificationEvent(), weakRootEventListener);
+                root.addEventHandler(TreeItem.<S>expandedItemCountChangeEvent(), weakRootEventListener);
                 weakOldItem = new WeakReference<>(root);
             }
 
