@@ -1809,7 +1809,7 @@ public class TreeTableView<S> extends Control {
         }
 
         if (treeItemIterator == null || _row <= treeItemIteratorRow) {
-            treeItemIterator = TreeUtil.visibleItems(getRoot()).iterator();
+            treeItemIterator = TreeUtil.getItems(getRoot()).iterator();
             treeItemIteratorRow = -1;
         }
 
