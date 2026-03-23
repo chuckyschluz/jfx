@@ -33,6 +33,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -758,12 +759,12 @@ public class TreeTableView<S> extends Control {
     // be recalculated.
     private boolean expandedItemCountDirty = true;
 
-    // Used in getTreeItem(int row) to cache row→item mappings and to maintain a
-    // persistent DFS iterator so that sequential access (e.g. selectAll) costs O(N)
-    // total rather than O(N²).  See JDK-8125681 for the original justification.
+    // Used in the getTreeItem(int row) method to act as a cache.
+    // See JDK-8125681 for the justification and performance gains.
     private Map<Integer, SoftReference<TreeItem<S>>> treeItemCacheMap = new HashMap<>();
-    private Iterator<TreeItem<S>> dfsIterator = null;
-    private int dfsIteratorRow = -1;
+    // Persistent DFS iterator so that sequential access is O(N) instead of O(N^2).
+    private Iterator<TreeItem<S>> treeItemIterator = null;
+    private int treeItemIteratorRow = -1;
 
     // this is the only publicly writable list for columns. This represents the
     // columns as they are given initially by the developer.
@@ -1809,30 +1810,25 @@ public class TreeTableView<S> extends Control {
         SoftReference<TreeItem<S>> ref = treeItemCacheMap.get(_row);
         if (ref != null) {
             TreeItem<S> cached = ref.get();
-            if (cached != null) return cached;
+            if (cached != null) {
+                return cached;
+            }
         }
 
-        // Cache miss. If the iterator has already passed _row the SoftReference was
-        // collected under memory pressure — fall back to a full DFS from root.
-        if (_row <= dfsIteratorRow) {
-            return TreeUtil.getItem(getRoot(), _row, expandedItemCountDirty);
+        if (treeItemIterator == null || _row <= treeItemIteratorRow) {
+            treeItemIterator = TreeUtil.visibleItems(getRoot()).iterator();
+            treeItemIteratorRow = -1;
         }
 
-        // Advance the persistent DFS iterator to _row, caching every item along the
-        // way.  Sequential access (e.g. selectAll) costs O(N) total because the
-        // iterator moves forward by exactly one step per new row.
-        if (dfsIterator == null) {
-            dfsIterator = TreeUtil.visibleItems(getRoot()).iterator();
-            dfsIteratorRow = -1;
-        }
-        while (dfsIterator.hasNext()) {
-            TreeItem<S> item = dfsIterator.next();
-            treeItemCacheMap.put(++dfsIteratorRow, new SoftReference<>(item));
-            if (dfsIteratorRow == _row) return item;
+        while (treeItemIterator.hasNext()) {
+            TreeItem<S> item = treeItemIterator.next();
+            treeItemCacheMap.put(++treeItemIteratorRow, new SoftReference<>(item));
+            if (treeItemIteratorRow == _row) {
+                return item;
+            }
         }
 
-        // Iterator exhausted before reaching _row — bizarre edge case (e.g. the row
-        // count and tree structure are momentarily out of sync).
+        // Iterator is exhausted before reaching _row. Should not happen in normal use.
         return TreeUtil.getItem(getRoot(), _row, expandedItemCountDirty);
     }
 
@@ -2134,8 +2130,8 @@ public class TreeTableView<S> extends Control {
 
         if (expandedItemCountDirty) {
             treeItemCacheMap.clear();
-            dfsIterator = null;
-            dfsIteratorRow = -1;
+            treeItemIterator = null;
+            treeItemIteratorRow = -1;
         }
 
         expandedItemCountDirty = false;
